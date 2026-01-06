@@ -1,291 +1,201 @@
 /**
- * JSON Schema for OTLP Metrics (ExportMetricsServiceRequest)
+ * Zod Schema for OTLP Metrics (ExportMetricsServiceRequest)
  * Based on: https://github.com/open-telemetry/opentelemetry-proto
  * Encoding rules: https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding
  */
 
-import { commonDefs } from './common';
+import { z } from 'zod';
+import {
+  int64Schema,
+  traceIdSchema,
+  spanIdSchema,
+  keyValueSchema,
+  resourceSchema,
+  instrumentationScopeSchema
+} from './common';
 
-/** Exemplar definition */
-const exemplarDef = {
-  type: 'object',
-  properties: {
-    filteredAttributes: {
-      type: 'array',
-      items: { $ref: '#/$defs/keyValue' }
-    },
-    timeUnixNano: { type: ['string', 'integer'] },
-    asDouble: { type: 'number' },
-    asInt: { type: ['string', 'integer'] },
-    spanId: {
-      type: 'string',
-      pattern: '^[a-fA-F0-9]{16}$'
-    },
-    traceId: {
-      type: 'string',
-      pattern: '^[a-fA-F0-9]{32}$'
-    }
-  }
-};
+/** Exemplar */
+const exemplarSchema = z.object({
+  filteredAttributes: z.array(keyValueSchema).optional(),
+  timeUnixNano: int64Schema.optional(),
+  asDouble: z.number().optional(),
+  asInt: int64Schema.optional(),
+  spanId: spanIdSchema.optional(),
+  traceId: traceIdSchema.optional()
+}).passthrough();
 
-/** NumberDataPoint definition (for Gauge and Sum) */
-const numberDataPointDef = {
-  type: 'object',
-  properties: {
-    attributes: {
-      type: 'array',
-      items: { $ref: '#/$defs/keyValue' }
-    },
-    startTimeUnixNano: { type: ['string', 'integer'] },
-    timeUnixNano: { type: ['string', 'integer'] },
-    asDouble: { type: 'number' },
-    asInt: { type: ['string', 'integer'] },
-    exemplars: {
-      type: 'array',
-      items: { $ref: '#/$defs/exemplar' }
-    },
-    flags: { type: 'integer' }
-  }
-};
+/** NumberDataPoint (for Gauge and Sum) */
+const numberDataPointSchema = z.object({
+  attributes: z.array(keyValueSchema).optional(),
+  startTimeUnixNano: int64Schema.optional(),
+  timeUnixNano: int64Schema.optional(),
+  asDouble: z.number().optional(),
+  asInt: int64Schema.optional(),
+  exemplars: z.array(exemplarSchema).optional(),
+  flags: z.number({
+    message: 'flags must be a number'
+  }).int().optional()
+}).passthrough();
 
-/** HistogramDataPoint definition */
-const histogramDataPointDef = {
-  type: 'object',
-  properties: {
-    attributes: {
-      type: 'array',
-      items: { $ref: '#/$defs/keyValue' }
-    },
-    startTimeUnixNano: { type: ['string', 'integer'] },
-    timeUnixNano: { type: ['string', 'integer'] },
-    count: { type: ['string', 'integer'] },
-    sum: { type: 'number' },
-    bucketCounts: {
-      type: 'array',
-      items: { type: ['string', 'integer'] }
-    },
-    explicitBounds: {
-      type: 'array',
-      items: { type: 'number' }
-    },
-    exemplars: {
-      type: 'array',
-      items: { $ref: '#/$defs/exemplar' }
-    },
-    flags: { type: 'integer' },
-    min: { type: 'number' },
-    max: { type: 'number' }
-  }
-};
+/** HistogramDataPoint */
+const histogramDataPointSchema = z.object({
+  attributes: z.array(keyValueSchema).optional(),
+  startTimeUnixNano: int64Schema.optional(),
+  timeUnixNano: int64Schema.optional(),
+  count: int64Schema.optional(),
+  sum: z.number().optional(),
+  bucketCounts: z.array(int64Schema).optional(),
+  explicitBounds: z.array(z.number({
+    message: 'explicitBounds values must be numbers'
+  })).optional(),
+  exemplars: z.array(exemplarSchema).optional(),
+  flags: z.number({
+    message: 'flags must be a number'
+  }).int().optional(),
+  min: z.number().optional(),
+  max: z.number().optional()
+}).passthrough();
 
-/** ExponentialHistogramDataPoint definition */
-const exponentialHistogramDataPointDef = {
-  type: 'object',
-  properties: {
-    attributes: {
-      type: 'array',
-      items: { $ref: '#/$defs/keyValue' }
-    },
-    startTimeUnixNano: { type: ['string', 'integer'] },
-    timeUnixNano: { type: ['string', 'integer'] },
-    count: { type: ['string', 'integer'] },
-    sum: { type: 'number' },
-    scale: { type: 'integer' },
-    zeroCount: { type: ['string', 'integer'] },
-    positive: {
-      type: 'object',
-      properties: {
-        offset: { type: 'integer' },
-        bucketCounts: {
-          type: 'array',
-          items: { type: ['string', 'integer'] }
-        }
-      }
-    },
-    negative: {
-      type: 'object',
-      properties: {
-        offset: { type: 'integer' },
-        bucketCounts: {
-          type: 'array',
-          items: { type: ['string', 'integer'] }
-        }
-      }
-    },
-    flags: { type: 'integer' },
-    exemplars: {
-      type: 'array',
-      items: { $ref: '#/$defs/exemplar' }
-    },
-    min: { type: 'number' },
-    max: { type: 'number' },
-    zeroThreshold: { type: 'number' }
-  }
-};
+/** ExponentialHistogram Buckets */
+const bucketsSchema = z.object({
+  offset: z.number({
+    message: 'offset must be a number'
+  }).int({
+    message: 'offset must be an integer'
+  }).optional(),
+  bucketCounts: z.array(int64Schema).optional()
+}).passthrough();
 
-/** SummaryDataPoint definition */
-const summaryDataPointDef = {
-  type: 'object',
-  properties: {
-    attributes: {
-      type: 'array',
-      items: { $ref: '#/$defs/keyValue' }
-    },
-    startTimeUnixNano: { type: ['string', 'integer'] },
-    timeUnixNano: { type: ['string', 'integer'] },
-    count: { type: ['string', 'integer'] },
-    sum: { type: 'number' },
-    quantileValues: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          quantile: { type: 'number' },
-          value: { type: 'number' }
-        }
-      }
-    },
-    flags: { type: 'integer' }
-  }
-};
+/** ExponentialHistogramDataPoint */
+const exponentialHistogramDataPointSchema = z.object({
+  attributes: z.array(keyValueSchema).optional(),
+  startTimeUnixNano: int64Schema.optional(),
+  timeUnixNano: int64Schema.optional(),
+  count: int64Schema.optional(),
+  sum: z.number().optional(),
+  scale: z.number({
+    message: 'scale must be a number'
+  }).int({
+    message: 'scale must be an integer'
+  }).optional(),
+  zeroCount: int64Schema.optional(),
+  positive: bucketsSchema.optional(),
+  negative: bucketsSchema.optional(),
+  flags: z.number({
+    message: 'flags must be a number'
+  }).int().optional(),
+  exemplars: z.array(exemplarSchema).optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  zeroThreshold: z.number().optional()
+}).passthrough();
 
-/** Gauge metric definition */
-const gaugeDef = {
-  type: 'object',
-  properties: {
-    dataPoints: {
-      type: 'array',
-      items: { $ref: '#/$defs/numberDataPoint' }
-    }
-  }
-};
+/** SummaryDataPoint ValueAtQuantile */
+const quantileValueSchema = z.object({
+  quantile: z.number({
+    message: 'quantile must be a number'
+  }).optional(),
+  value: z.number({
+    message: 'value must be a number'
+  }).optional()
+}).passthrough();
 
-/** Sum metric definition */
-const sumDef = {
-  type: 'object',
-  properties: {
-    dataPoints: {
-      type: 'array',
-      items: { $ref: '#/$defs/numberDataPoint' }
-    },
-    aggregationTemporality: {
-      type: 'integer',
-      enum: [0, 1, 2] // UNSPECIFIED=0, DELTA=1, CUMULATIVE=2
-    },
-    isMonotonic: { type: 'boolean' }
-  }
-};
+/** SummaryDataPoint */
+const summaryDataPointSchema = z.object({
+  attributes: z.array(keyValueSchema).optional(),
+  startTimeUnixNano: int64Schema.optional(),
+  timeUnixNano: int64Schema.optional(),
+  count: int64Schema.optional(),
+  sum: z.number().optional(),
+  quantileValues: z.array(quantileValueSchema).optional(),
+  flags: z.number({
+    message: 'flags must be a number'
+  }).int().optional()
+}).passthrough();
 
-/** Histogram metric definition */
-const histogramDef = {
-  type: 'object',
-  properties: {
-    dataPoints: {
-      type: 'array',
-      items: { $ref: '#/$defs/histogramDataPoint' }
-    },
-    aggregationTemporality: {
-      type: 'integer',
-      enum: [0, 1, 2] // UNSPECIFIED=0, DELTA=1, CUMULATIVE=2
-    }
-  }
-};
+/** Gauge metric */
+const gaugeSchema = z.object({
+  dataPoints: z.array(numberDataPointSchema).optional()
+}).passthrough();
 
-/** ExponentialHistogram metric definition */
-const exponentialHistogramDef = {
-  type: 'object',
-  properties: {
-    dataPoints: {
-      type: 'array',
-      items: { $ref: '#/$defs/exponentialHistogramDataPoint' }
-    },
-    aggregationTemporality: {
-      type: 'integer',
-      enum: [0, 1, 2] // UNSPECIFIED=0, DELTA=1, CUMULATIVE=2
-    }
-  }
-};
+/** Sum metric */
+const sumSchema = z.object({
+  dataPoints: z.array(numberDataPointSchema).optional(),
+  aggregationTemporality: z.number({
+    message: 'aggregationTemporality must be a number'
+  }).int({
+    message: 'aggregationTemporality must be an integer'
+  }).min(0, {
+    message: 'aggregationTemporality must be >= 0'
+  }).max(2, {
+    message: 'aggregationTemporality must be <= 2 (UNSPECIFIED=0, DELTA=1, CUMULATIVE=2)'
+  }).optional(),
+  isMonotonic: z.boolean({
+    message: 'isMonotonic must be a boolean'
+  }).optional()
+}).passthrough();
 
-/** Summary metric definition */
-const summaryDef = {
-  type: 'object',
-  properties: {
-    dataPoints: {
-      type: 'array',
-      items: { $ref: '#/$defs/summaryDataPoint' }
-    }
-  }
-};
+/** Histogram metric */
+const histogramSchema = z.object({
+  dataPoints: z.array(histogramDataPointSchema).optional(),
+  aggregationTemporality: z.number({
+    message: 'aggregationTemporality must be a number'
+  }).int({
+    message: 'aggregationTemporality must be an integer'
+  }).min(0, {
+    message: 'aggregationTemporality must be >= 0'
+  }).max(2, {
+    message: 'aggregationTemporality must be <= 2 (UNSPECIFIED=0, DELTA=1, CUMULATIVE=2)'
+  }).optional()
+}).passthrough();
 
-/** Metric definition */
-const metricDef = {
-  type: 'object',
-  properties: {
-    name: { type: 'string' },
-    description: { type: 'string' },
-    unit: { type: 'string' },
-    metadata: {
-      type: 'array',
-      items: { $ref: '#/$defs/keyValue' }
-    },
-    gauge: { $ref: '#/$defs/gauge' },
-    sum: { $ref: '#/$defs/sum' },
-    histogram: { $ref: '#/$defs/histogram' },
-    exponentialHistogram: { $ref: '#/$defs/exponentialHistogram' },
-    summary: { $ref: '#/$defs/summary' }
-  }
-};
+/** ExponentialHistogram metric */
+const exponentialHistogramSchema = z.object({
+  dataPoints: z.array(exponentialHistogramDataPointSchema).optional(),
+  aggregationTemporality: z.number({
+    message: 'aggregationTemporality must be a number'
+  }).int({
+    message: 'aggregationTemporality must be an integer'
+  }).min(0, {
+    message: 'aggregationTemporality must be >= 0'
+  }).max(2, {
+    message: 'aggregationTemporality must be <= 2 (UNSPECIFIED=0, DELTA=1, CUMULATIVE=2)'
+  }).optional()
+}).passthrough();
 
-/** ScopeMetrics definition */
-const scopeMetricsDef = {
-  type: 'object',
-  properties: {
-    scope: { $ref: '#/$defs/instrumentationScope' },
-    metrics: {
-      type: 'array',
-      items: { $ref: '#/$defs/metric' }
-    },
-    schemaUrl: { type: 'string' }
-  }
-};
+/** Summary metric */
+const summarySchema = z.object({
+  dataPoints: z.array(summaryDataPointSchema).optional()
+}).passthrough();
 
-/** ResourceMetrics definition */
-const resourceMetricsDef = {
-  type: 'object',
-  properties: {
-    resource: { $ref: '#/$defs/resource' },
-    scopeMetrics: {
-      type: 'array',
-      items: { $ref: '#/$defs/scopeMetrics' }
-    },
-    schemaUrl: { type: 'string' }
-  }
-};
+/** Metric */
+const metricSchema = z.object({
+  name: z.string().optional(),
+  description: z.string().optional(),
+  unit: z.string().optional(),
+  metadata: z.array(keyValueSchema).optional(),
+  gauge: gaugeSchema.optional(),
+  sum: sumSchema.optional(),
+  histogram: histogramSchema.optional(),
+  exponentialHistogram: exponentialHistogramSchema.optional(),
+  summary: summarySchema.optional()
+}).passthrough();
+
+/** ScopeMetrics */
+const scopeMetricsSchema = z.object({
+  scope: instrumentationScopeSchema.optional(),
+  metrics: z.array(metricSchema).optional(),
+  schemaUrl: z.string().optional()
+}).passthrough();
+
+/** ResourceMetrics */
+const resourceMetricsSchema = z.object({
+  resource: resourceSchema.optional(),
+  scopeMetrics: z.array(scopeMetricsSchema).optional(),
+  schemaUrl: z.string().optional()
+}).passthrough();
 
 /** Full metrics schema (ExportMetricsServiceRequest) */
-export const metricsSchema = {
-  $id: 'otlp-metrics',
-  type: 'object',
-  properties: {
-    resourceMetrics: {
-      type: 'array',
-      items: { $ref: '#/$defs/resourceMetrics' }
-    }
-  },
-  $defs: {
-    ...commonDefs,
-    exemplar: exemplarDef,
-    numberDataPoint: numberDataPointDef,
-    histogramDataPoint: histogramDataPointDef,
-    exponentialHistogramDataPoint: exponentialHistogramDataPointDef,
-    summaryDataPoint: summaryDataPointDef,
-    gauge: gaugeDef,
-    sum: sumDef,
-    histogram: histogramDef,
-    exponentialHistogram: exponentialHistogramDef,
-    summary: summaryDef,
-    metric: metricDef,
-    scopeMetrics: scopeMetricsDef,
-    resourceMetrics: resourceMetricsDef
-  }
-};
+export const metricsSchema = z.object({
+  resourceMetrics: z.array(resourceMetricsSchema).optional()
+}).passthrough();

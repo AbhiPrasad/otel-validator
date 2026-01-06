@@ -1,9 +1,8 @@
 /**
  * OTLP Payload Validation Orchestrator
- * Combines JSON Schema validation with semantic validation for traces, logs, and metrics.
+ * Combines Zod schema validation with semantic validation for traces, logs, and metrics.
  */
 
-import Ajv from 'ajv';
 import type { ValidationResult, ValidationError, OTLPPayloadType } from './types';
 import { detectPayloadType } from './payload-detector';
 import { tracesSchema } from './schema/traces';
@@ -13,19 +12,11 @@ import { validateTraceSemantics } from './semantic/traces';
 import { validateLogSemantics } from './semantic/logs';
 import { validateMetricSemantics } from './semantic/metrics';
 
-// Initialize Ajv with appropriate options for OTLP validation
-const ajv = new Ajv({
-  allErrors: true,        // Report all errors, not just first
-  strict: false,          // Allow flexible schema definitions
-  allowUnionTypes: true,  // Support type: ["string", "integer"] for 64-bit ints
-  verbose: true           // Include data in error messages for debugging
-});
-
-// Compile schemas once at module load
-const validators = {
-  traces: ajv.compile(tracesSchema),
-  logs: ajv.compile(logsSchema),
-  metrics: ajv.compile(metricsSchema)
+// Zod schemas by payload type
+const schemas = {
+  traces: tracesSchema,
+  logs: logsSchema,
+  metrics: metricsSchema
 };
 
 // Semantic validators by payload type
@@ -34,6 +25,14 @@ const semanticValidators = {
   logs: validateLogSemantics,
   metrics: validateMetricSemantics
 };
+
+/**
+ * Convert Zod error path to JSON Pointer format
+ */
+function pathToJsonPointer(path: (string | number)[]): string {
+  if (path.length === 0) return '/';
+  return '/' + path.join('/');
+}
 
 /**
  * Validate an OTLP payload (traces, logs, or metrics).
@@ -58,17 +57,17 @@ export function validateOTLPPayload(payload: unknown): ValidationResult {
 
   const errors: ValidationError[] = [];
 
-  // Step 1: JSON Schema validation
-  const validator = validators[payloadType];
-  const schemaValid = validator(payload);
+  // Step 1: Zod Schema validation
+  const schema = schemas[payloadType];
+  const result = schema.safeParse(payload);
 
-  if (!schemaValid && validator.errors) {
-    for (const err of validator.errors) {
+  if (!result.success) {
+    for (const issue of result.error.issues) {
       errors.push({
-        path: err.instancePath || '/',
-        message: err.message || 'Validation error',
-        keyword: err.keyword,
-        schemaPath: err.schemaPath
+        path: pathToJsonPointer(issue.path),
+        message: issue.message,
+        keyword: issue.code,
+        schemaPath: `#/${payloadType}`
       });
     }
   }

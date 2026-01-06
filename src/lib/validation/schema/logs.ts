@@ -1,81 +1,61 @@
 /**
- * JSON Schema for OTLP Logs (ExportLogsServiceRequest)
+ * Zod Schema for OTLP Logs (ExportLogsServiceRequest)
  * Based on: https://github.com/open-telemetry/opentelemetry-proto
  * Encoding rules: https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding
  */
 
-import { commonDefs } from './common';
+import { z } from 'zod';
+import {
+  int64Schema,
+  traceIdSchema,
+  spanIdSchema,
+  keyValueSchema,
+  anyValueSchema,
+  resourceSchema,
+  instrumentationScopeSchema
+} from './common';
 
-/** LogRecord definition */
-const logRecordDef = {
-  type: 'object',
-  properties: {
-    timeUnixNano: { type: ['string', 'integer'] },
-    observedTimeUnixNano: { type: ['string', 'integer'] },
-    severityNumber: {
-      type: 'integer',
-      minimum: 0,
-      maximum: 24 // UNSPECIFIED=0 through FATAL4=24
-    },
-    severityText: { type: 'string' },
-    body: { $ref: '#/$defs/anyValue' },
-    attributes: {
-      type: 'array',
-      items: { $ref: '#/$defs/keyValue' }
-    },
-    droppedAttributesCount: { type: 'integer', minimum: 0 },
-    flags: { type: 'integer' },
-    traceId: {
-      type: 'string',
-      pattern: '^[a-fA-F0-9]{32}$' // 32 hex chars when present
-    },
-    spanId: {
-      type: 'string',
-      pattern: '^[a-fA-F0-9]{16}$' // 16 hex chars when present
-    }
-  }
-};
+/** LogRecord */
+const logRecordSchema = z.object({
+  timeUnixNano: int64Schema.optional(),
+  observedTimeUnixNano: int64Schema.optional(),
+  severityNumber: z.number({
+    message: 'severityNumber must be a number'
+  }).int({
+    message: 'severityNumber must be an integer'
+  }).min(0, {
+    message: 'severityNumber must be >= 0'
+  }).max(24, {
+    message: 'severityNumber must be <= 24 (UNSPECIFIED=0, TRACE=1-4, DEBUG=5-8, INFO=9-12, WARN=13-16, ERROR=17-20, FATAL=21-24)'
+  }).optional(),
+  severityText: z.string().optional(),
+  body: anyValueSchema.optional(),
+  attributes: z.array(keyValueSchema).optional(),
+  droppedAttributesCount: z.number({
+    message: 'droppedAttributesCount must be a number'
+  }).int().min(0).optional(),
+  flags: z.number({
+    message: 'flags must be a number'
+  }).int().optional(),
+  traceId: traceIdSchema.optional(),
+  spanId: spanIdSchema.optional()
+}).passthrough();
 
-/** ScopeLogs definition */
-const scopeLogsDef = {
-  type: 'object',
-  properties: {
-    scope: { $ref: '#/$defs/instrumentationScope' },
-    logRecords: {
-      type: 'array',
-      items: { $ref: '#/$defs/logRecord' }
-    },
-    schemaUrl: { type: 'string' }
-  }
-};
+/** ScopeLogs */
+const scopeLogsSchema = z.object({
+  scope: instrumentationScopeSchema.optional(),
+  logRecords: z.array(logRecordSchema).optional(),
+  schemaUrl: z.string().optional()
+}).passthrough();
 
-/** ResourceLogs definition */
-const resourceLogsDef = {
-  type: 'object',
-  properties: {
-    resource: { $ref: '#/$defs/resource' },
-    scopeLogs: {
-      type: 'array',
-      items: { $ref: '#/$defs/scopeLogs' }
-    },
-    schemaUrl: { type: 'string' }
-  }
-};
+/** ResourceLogs */
+const resourceLogsSchema = z.object({
+  resource: resourceSchema.optional(),
+  scopeLogs: z.array(scopeLogsSchema).optional(),
+  schemaUrl: z.string().optional()
+}).passthrough();
 
 /** Full logs schema (ExportLogsServiceRequest) */
-export const logsSchema = {
-  $id: 'otlp-logs',
-  type: 'object',
-  properties: {
-    resourceLogs: {
-      type: 'array',
-      items: { $ref: '#/$defs/resourceLogs' }
-    }
-  },
-  $defs: {
-    ...commonDefs,
-    logRecord: logRecordDef,
-    scopeLogs: scopeLogsDef,
-    resourceLogs: resourceLogsDef
-  }
-};
+export const logsSchema = z.object({
+  resourceLogs: z.array(resourceLogsSchema).optional()
+}).passthrough();

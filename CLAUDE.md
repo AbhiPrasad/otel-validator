@@ -36,7 +36,7 @@ Access Cloudflare runtime APIs (env vars, KV, D1, etc.) via `Astro.locals.runtim
 ```typescript
 // In .astro files or API routes
 const runtime = Astro.locals.runtime;
-const env = runtime.env;  // Access bindings defined in wrangler.jsonc
+const env = runtime.env; // Access bindings defined in wrangler.jsonc
 ```
 
 Type definitions for bindings go in `worker-configuration.d.ts` (generate with `yarn cf-typegen`).
@@ -48,6 +48,7 @@ The app validates OpenTelemetry Protocol (OTLP) payloads for traces, logs, and m
 ### API Endpoint
 
 `POST /api/validate` - Validates OTLP payloads
+
 - Content-Type: `application/json` for JSON payloads
 - Returns `200` with `{success: true, payloadType}` if valid
 - Returns `400` with `{success: false, errors: [...]}` if invalid
@@ -60,7 +61,7 @@ src/lib/validation/
   index.ts              # Main validateOTLPPayload() function
   types.ts              # TypeScript types (ValidationError, ValidationResult)
   payload-detector.ts   # Auto-detects traces/logs/metrics from payload
-  schema/               # JSON Schemas (Ajv) for structural validation
+  schema/               # Zod schemas for structural validation
     common.ts           # Shared definitions (resource, keyValue, anyValue)
     traces.ts           # ExportTraceServiceRequest schema
     logs.ts             # ExportLogsServiceRequest schema
@@ -74,6 +75,7 @@ src/lib/validation/
 ### OTLP JSON Encoding Rules
 
 Per https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding:
+
 - traceId/spanId: hex-encoded strings (case-insensitive), 32/16 chars respectively
 - Enums: integers only (e.g., `kind: 2` not `kind: "SERVER"`)
 - Field names: lowerCamelCase (e.g., `droppedAttributesCount`)
