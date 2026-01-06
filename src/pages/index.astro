@@ -1,16 +1,586 @@
 ---
-
+export const prerender = false;
 ---
 
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OTLP Payload Validator</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+        background: #f5f5f5;
+        color: #333;
+      }
+
+      h1 {
+        color: #1a1a2e;
+        margin-bottom: 0.5rem;
+      }
+
+      .subtitle {
+        color: #666;
+        margin-bottom: 2rem;
+      }
+
+      .input-section {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+
+      .input-section h2 {
+        margin-top: 0;
+        font-size: 1.1rem;
+        color: #444;
+      }
+
+      textarea {
+        width: 100%;
+        height: 300px;
+        font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+        font-size: 13px;
+        padding: 1rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        resize: vertical;
+        tab-size: 2;
+      }
+
+      textarea:focus {
+        outline: none;
+        border-color: #4a90d9;
+        box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.1);
+      }
+
+      .file-upload {
+        margin-top: 1rem;
+        padding: 1rem;
+        border: 2px dashed #ddd;
+        border-radius: 4px;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.2s, background 0.2s;
+      }
+
+      .file-upload:hover {
+        border-color: #4a90d9;
+        background: #fafafa;
+      }
+
+      .file-upload.dragover {
+        border-color: #4a90d9;
+        background: #f0f7ff;
+      }
+
+      .file-upload p {
+        margin: 0;
+        color: #666;
+      }
+
+      .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1rem;
+      }
+
+      button {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.2s, transform 0.1s;
+      }
+
+      button:active {
+        transform: scale(0.98);
+      }
+
+      .validate-btn {
+        background: #4a90d9;
+        color: white;
+      }
+
+      .validate-btn:hover {
+        background: #3a7bc8;
+      }
+
+      .validate-btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .clear-btn {
+        background: #e0e0e0;
+        color: #333;
+      }
+
+      .clear-btn:hover {
+        background: #d0d0d0;
+      }
+
+      .example-btn {
+        background: #f0f0f0;
+        color: #555;
+        font-size: 0.9rem;
+        padding: 0.6rem 1rem;
+      }
+
+      .example-btn:hover {
+        background: #e8e8e8;
+      }
+
+      .results-section {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+
+      .results-section h2 {
+        margin-top: 0;
+        font-size: 1.1rem;
+      }
+
+      .result-status {
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .result-status.valid {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+
+      .result-status.invalid {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+
+      .result-status.pending {
+        background: #e2e3e5;
+        color: #383d41;
+        border: 1px solid #d6d8db;
+      }
+
+      .payload-type {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        background: rgba(0,0,0,0.1);
+        border-radius: 4px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        margin-left: 0.5rem;
+      }
+
+      .error-list, .warning-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .error-item {
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        background: #fff5f5;
+        border: 1px solid #fed7d7;
+        border-radius: 4px;
+        border-left: 4px solid #e53e3e;
+      }
+
+      .error-path {
+        font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+        font-size: 0.85rem;
+        color: #c53030;
+        margin-bottom: 0.5rem;
+        word-break: break-all;
+      }
+
+      .error-message {
+        color: #333;
+        margin-bottom: 0.5rem;
+      }
+
+      .error-keyword {
+        display: inline-block;
+        font-size: 0.75rem;
+        background: #edf2f7;
+        color: #4a5568;
+        padding: 0.2rem 0.5rem;
+        border-radius: 3px;
+      }
+
+      .warning-item {
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        background: #fffaf0;
+        border: 1px solid #feebc8;
+        border-radius: 4px;
+        border-left: 4px solid #ed8936;
+      }
+
+      .warning-path {
+        font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+        font-size: 0.85rem;
+        color: #c05621;
+        margin-bottom: 0.5rem;
+        word-break: break-all;
+      }
+
+      .warning-suggestion {
+        margin-top: 0.5rem;
+        color: #666;
+        font-size: 0.9rem;
+      }
+
+      h3 {
+        font-size: 1rem;
+        color: #444;
+        margin: 1.5rem 0 0.75rem;
+      }
+
+      h3:first-of-type {
+        margin-top: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>OTLP Payload Validator</h1>
+    <p class="subtitle">Validate OpenTelemetry Protocol (OTLP) payloads for traces, logs, and metrics</p>
+
+    <div class="input-section">
+      <h2>Input Payload</h2>
+      <textarea
+        id="payload-input"
+        placeholder="Paste your OTLP JSON payload here..."
+        spellcheck="false"
+      ></textarea>
+
+      <div class="file-upload" id="file-drop">
+        <p>Drop a file here or click to upload (.json or .pb files)</p>
+        <input type="file" id="file-input" accept=".json,.pb,.bin" style="display: none" />
+      </div>
+
+      <div class="buttons">
+        <button class="validate-btn" id="validate-btn">Validate</button>
+        <button class="clear-btn" id="clear-btn">Clear</button>
+        <button class="example-btn" id="example-traces">Example Traces</button>
+        <button class="example-btn" id="example-logs">Example Logs</button>
+        <button class="example-btn" id="example-metrics">Example Metrics</button>
+      </div>
+    </div>
+
+    <div class="results-section">
+      <h2>Validation Results</h2>
+      <div id="results-container">
+        <div class="result-status pending">
+          Enter a payload and click Validate to see results
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Example OTLP payloads
+      const examples = {
+        traces: {
+          resourceSpans: [{
+            resource: {
+              attributes: [
+                { key: "service.name", value: { stringValue: "my-service" } }
+              ]
+            },
+            scopeSpans: [{
+              scope: { name: "my-library", version: "1.0.0" },
+              spans: [{
+                traceId: "0123456789abcdef0123456789abcdef",
+                spanId: "0123456789abcdef",
+                name: "GET /api/users",
+                kind: 2,
+                startTimeUnixNano: "1704067200000000000",
+                endTimeUnixNano: "1704067200100000000",
+                attributes: [
+                  { key: "http.method", value: { stringValue: "GET" } },
+                  { key: "http.status_code", value: { intValue: 200 } }
+                ],
+                status: { code: 1 }
+              }]
+            }]
+          }]
+        },
+        logs: {
+          resourceLogs: [{
+            resource: {
+              attributes: [
+                { key: "service.name", value: { stringValue: "my-service" } }
+              ]
+            },
+            scopeLogs: [{
+              scope: { name: "my-logger" },
+              logRecords: [{
+                timeUnixNano: "1704067200000000000",
+                observedTimeUnixNano: "1704067200001000000",
+                severityNumber: 9,
+                severityText: "INFO",
+                body: { stringValue: "User logged in successfully" },
+                attributes: [
+                  { key: "user.id", value: { stringValue: "12345" } }
+                ]
+              }]
+            }]
+          }]
+        },
+        metrics: {
+          resourceMetrics: [{
+            resource: {
+              attributes: [
+                { key: "service.name", value: { stringValue: "my-service" } }
+              ]
+            },
+            scopeMetrics: [{
+              scope: { name: "my-meter" },
+              metrics: [{
+                name: "http.request.duration",
+                description: "Duration of HTTP requests",
+                unit: "ms",
+                histogram: {
+                  aggregationTemporality: 2,
+                  dataPoints: [{
+                    startTimeUnixNano: "1704067200000000000",
+                    timeUnixNano: "1704067260000000000",
+                    count: "100",
+                    sum: 5432.1,
+                    bucketCounts: ["10", "25", "40", "20", "5"],
+                    explicitBounds: [10, 50, 100, 500],
+                    min: 2.5,
+                    max: 892.3
+                  }]
+                }
+              }]
+            }]
+          }]
+        }
+      };
+
+      const textarea = document.getElementById('payload-input');
+      const validateBtn = document.getElementById('validate-btn');
+      const clearBtn = document.getElementById('clear-btn');
+      const resultsContainer = document.getElementById('results-container');
+      const fileDrop = document.getElementById('file-drop');
+      const fileInput = document.getElementById('file-input');
+
+      // Example buttons
+      document.getElementById('example-traces').onclick = () => {
+        textarea.value = JSON.stringify(examples.traces, null, 2);
+      };
+      document.getElementById('example-logs').onclick = () => {
+        textarea.value = JSON.stringify(examples.logs, null, 2);
+      };
+      document.getElementById('example-metrics').onclick = () => {
+        textarea.value = JSON.stringify(examples.metrics, null, 2);
+      };
+
+      // Clear button
+      clearBtn.onclick = () => {
+        textarea.value = '';
+        resultsContainer.innerHTML = `
+          <div class="result-status pending">
+            Enter a payload and click Validate to see results
+          </div>
+        `;
+      };
+
+      // File upload handling
+      fileDrop.onclick = () => fileInput.click();
+
+      fileDrop.ondragover = (e) => {
+        e.preventDefault();
+        fileDrop.classList.add('dragover');
+      };
+
+      fileDrop.ondragleave = () => {
+        fileDrop.classList.remove('dragover');
+      };
+
+      fileDrop.ondrop = async (e) => {
+        e.preventDefault();
+        fileDrop.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file) await handleFile(file);
+      };
+
+      fileInput.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file) await handleFile(file);
+      };
+
+      async function handleFile(file) {
+        if (file.name.endsWith('.json')) {
+          const text = await file.text();
+          textarea.value = text;
+        } else if (file.name.endsWith('.pb') || file.name.endsWith('.bin')) {
+          // Binary file - validate directly
+          await validateProtobuf(file);
+        } else {
+          // Try to read as text
+          const text = await file.text();
+          textarea.value = text;
+        }
+      }
+
+      async function validateProtobuf(file) {
+        validateBtn.disabled = true;
+        validateBtn.textContent = 'Validating...';
+
+        try {
+          const buffer = await file.arrayBuffer();
+          const response = await fetch('/api/validate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-protobuf'
+            },
+            body: buffer
+          });
+
+          const result = await response.json();
+          displayResults(result);
+        } catch (e) {
+          displayResults({
+            success: false,
+            payloadType: null,
+            errors: [{ path: '', message: e.message, keyword: 'network', schemaPath: '#' }]
+          });
+        } finally {
+          validateBtn.disabled = false;
+          validateBtn.textContent = 'Validate';
+        }
+      }
+
+      // Validate button
+      validateBtn.onclick = async () => {
+        const payload = textarea.value.trim();
+
+        if (!payload) {
+          displayResults({
+            success: false,
+            payloadType: null,
+            errors: [{ path: '', message: 'Please enter a payload', keyword: 'required', schemaPath: '#' }]
+          });
+          return;
+        }
+
+        validateBtn.disabled = true;
+        validateBtn.textContent = 'Validating...';
+
+        try {
+          const response = await fetch('/api/validate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: payload
+          });
+
+          const result = await response.json();
+          displayResults(result);
+        } catch (e) {
+          displayResults({
+            success: false,
+            payloadType: null,
+            errors: [{ path: '', message: e.message, keyword: 'network', schemaPath: '#' }]
+          });
+        } finally {
+          validateBtn.disabled = false;
+          validateBtn.textContent = 'Validate';
+        }
+      };
+
+      // Keyboard shortcut: Ctrl/Cmd + Enter to validate
+      textarea.onkeydown = (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          validateBtn.click();
+        }
+      };
+
+      function displayResults(result) {
+        let html = '';
+
+        if (result.success) {
+          html = `
+            <div class="result-status valid">
+              <span>Valid payload</span>
+              <span class="payload-type">${result.payloadType}</span>
+            </div>
+          `;
+        } else {
+          html = `
+            <div class="result-status invalid">
+              <span>Invalid payload</span>
+              ${result.payloadType ? `<span class="payload-type">${result.payloadType}</span>` : ''}
+            </div>
+          `;
+
+          if (result.errors && result.errors.length > 0) {
+            html += '<h3>Errors</h3><ul class="error-list">';
+            for (const error of result.errors) {
+              html += `
+                <li class="error-item">
+                  <div class="error-path">${escapeHtml(error.path || '(root)')}</div>
+                  <div class="error-message">${escapeHtml(error.message)}</div>
+                  <span class="error-keyword">${escapeHtml(error.keyword)}</span>
+                </li>
+              `;
+            }
+            html += '</ul>';
+          }
+        }
+
+        // Warnings (show for both valid and invalid)
+        if (result.warnings && result.warnings.length > 0) {
+          html += '<h3>Warnings</h3><ul class="warning-list">';
+          for (const warning of result.warnings) {
+            html += `
+              <li class="warning-item">
+                <div class="warning-path">${escapeHtml(warning.path || '(root)')}</div>
+                <div class="error-message">${escapeHtml(warning.message)}</div>
+                ${warning.suggestion ? `<div class="warning-suggestion">${escapeHtml(warning.suggestion)}</div>` : ''}
+              </li>
+            `;
+          }
+          html += '</ul>';
+        }
+
+        resultsContainer.innerHTML = html;
+      }
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+    </script>
+  </body>
 </html>

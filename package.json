@@ -12,6 +12,9 @@
 	},
 	"dependencies": {
 		"@astrojs/cloudflare": "^12.6.12",
+		"@opentelemetry/api": "^1.9.0",
+		"@opentelemetry/otlp-transformer": "^0.208.0",
+		"ajv": "^8.17.1",
 		"astro": "^5.16.6"
 	},
 	"devDependencies": {
