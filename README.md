@@ -1,43 +1,114 @@
-# Astro Starter Kit: Minimal
+# OTLP Validator
 
-```sh
-yarn create astro@latest -- --template minimal
+A web application for validating OpenTelemetry Protocol (OTLP) payloads. Deployed on Cloudflare Workers.
+
+**Live:** https://otel-validator.devabhiprasad.workers.dev/
+
+## Features
+
+- Validates OTLP traces, logs, and metrics payloads
+- Auto-detects payload type from structure
+- Returns detailed error messages with JSON paths to problematic fields
+- Follows [OTLP JSON encoding specification](https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding)
+
+## Usage
+
+### Web UI
+
+Visit the deployed application to use the interactive validator with:
+- JSON textarea input
+- Example payload buttons for traces, logs, and metrics
+- Real-time validation with detailed error display
+
+### API
+
+```bash
+POST /api/validate
+Content-Type: application/json
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+**Request:** OTLP JSON payload (traces, logs, or metrics)
 
-## 🚀 Project Structure
-
-Inside of your Astro project, you'll see the following folders and files:
-
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "payloadType": "traces",
+  "message": "Valid traces payload"
+}
 ```
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+**Error Response (400):**
+```json
+{
+  "success": false,
+  "payloadType": "traces",
+  "errors": [
+    {
+      "path": "/resourceSpans/0/scopeSpans/0/spans/0/traceId",
+      "message": "traceId must be exactly 32 hex characters",
+      "keyword": "invalid_format",
+      "schemaPath": "#/traces"
+    }
+  ]
+}
+```
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+### Example
 
-Any static assets, like images, can be placed in the `public/` directory.
+```bash
+# Valid payload
+curl -X POST https://otel-validator.devabhiprasad.workers.dev/api/validate \
+  -H "Content-Type: application/json" \
+  -d '{"resourceSpans":[]}'
 
-## 🧞 Commands
+# Invalid payload
+curl -X POST https://otel-validator.devabhiprasad.workers.dev/api/validate \
+  -H "Content-Type: application/json" \
+  -d '{"resourceSpans":[{"scopeSpans":[{"spans":[{"kind":"SERVER"}]}]}]}'
+```
 
-All commands are run from the root of the project, from a terminal:
+## OTLP JSON Encoding Rules
 
-| Command                | Action                                           |
-| :--------------------- | :----------------------------------------------- |
-| `yarn install`         | Installs dependencies                            |
-| `yarn dev`             | Starts local dev server at `localhost:4321`      |
-| `yarn build`           | Build your production site to `./dist/`          |
-| `yarn preview`         | Preview your build locally, before deploying     |
-| `yarn astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `yarn astro -- --help` | Get help using the Astro CLI                     |
+Per the [OTLP specification](https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding):
 
-## 👀 Want to learn more?
+| Field | Format |
+|-------|--------|
+| traceId | 32 hex characters (case-insensitive) |
+| spanId | 16 hex characters (case-insensitive) |
+| Enums (kind, code, severityNumber) | Integers only (not string names) |
+| Field names | lowerCamelCase |
+| 64-bit integers | String or number |
 
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+## Development
+
+```bash
+yarn install      # Install dependencies
+yarn dev          # Start dev server at localhost:4321
+yarn build        # Build for production
+yarn preview      # Preview with Wrangler locally
+yarn deploy       # Deploy to Cloudflare Workers
+```
+
+## Project Structure
+
+```
+src/
+  pages/
+    index.astro           # Web UI
+    api/
+      validate.ts         # Validation API endpoint
+  lib/
+    validation/
+      index.ts            # Main validateOTLPPayload() function
+      types.ts            # TypeScript types
+      payload-detector.ts # Auto-detects traces/logs/metrics
+      schema/             # Zod schemas for structural validation
+      semantic/           # OTel-specific semantic validation
+```
+
+## Tech Stack
+
+- [Astro](https://astro.build) - Web framework
+- [Cloudflare Workers](https://workers.cloudflare.com) - Edge deployment
+- [Zod](https://zod.dev) - Schema validation (Cloudflare Workers compatible)
