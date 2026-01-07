@@ -73,8 +73,8 @@ export const prerender = false;
         --text-secondary: #94a3b8;
         --text-muted: #64748b;
 
-        /* Accent colors - Brighter for dark mode */
-        --accent-primary: #00ffff;
+        /* Accent colors - Softer for dark mode */
+        --accent-primary: #38bdf8;
         --accent-secondary: #a855f7;
 
         /* Semantic colors - More vibrant in dark mode */
@@ -299,6 +299,10 @@ export const prerender = false;
         background: var(--accent-primary);
         color: white;
         font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
       }
 
       .validate-btn:hover {
@@ -306,11 +310,30 @@ export const prerender = false;
       }
 
       .validate-btn:disabled {
-        background: var(--button-secondary-bg);
-        color: var(--text-muted);
+        background: var(--accent-primary);
+        opacity: 0.7;
         cursor: not-allowed;
         transform: none;
-        box-shadow: none;
+      }
+
+      .validate-btn .spinner {
+        display: none;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      .validate-btn.loading .spinner {
+        display: block;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
       }
 
       .clear-btn {
@@ -743,7 +766,7 @@ export const prerender = false;
       </div>
 
       <div class="buttons">
-        <button class="validate-btn" id="validate-btn">Validate</button>
+        <button class="validate-btn" id="validate-btn"><span class="spinner"></span>Validate</button>
         <button class="clear-btn" id="clear-btn">Clear</button>
         <button class="example-btn" id="example-traces">Example Traces</button>
         <button class="example-btn" id="example-logs">Example Logs</button>
@@ -1019,7 +1042,7 @@ export const prerender = false;
 
       async function validateProtobuf(file: File): Promise<void> {
         validateBtn.disabled = true;
-        validateBtn.textContent = "Validating...";
+        validateBtn.classList.add("loading");
 
         try {
           const buffer = await file.arrayBuffer();
@@ -1049,7 +1072,7 @@ export const prerender = false;
           });
         } finally {
           validateBtn.disabled = false;
-          validateBtn.textContent = "Validate";
+          validateBtn.classList.remove("loading");
         }
       }
 
@@ -1074,7 +1097,7 @@ export const prerender = false;
         }
 
         validateBtn.disabled = true;
-        validateBtn.textContent = "Validating...";
+        validateBtn.classList.add("loading");
 
         try {
           const response = await fetch("/api/validate", {
@@ -1103,7 +1126,7 @@ export const prerender = false;
           });
         } finally {
           validateBtn.disabled = false;
-          validateBtn.textContent = "Validate";
+          validateBtn.classList.remove("loading");
         }
       };
 
