@@ -1,0 +1,350 @@
+---
+export const prerender = false;
+import Layout from '../components/Layout.astro';
+import { getNamespaces, getConventionCount } from '../lib/semconv';
+
+const namespaces = getNamespaces();
+const totalCount = getConventionCount();
+---
+
+<Layout 
+  title="Semantic Conventions" 
+  description="Search and browse OpenTelemetry semantic conventions"
+  activeNav="semconv"
+>
+  <h1>Semantic Conventions</h1>
+  <p class="subtitle">Search and browse OpenTelemetry semantic conventions ({totalCount} attributes)</p>
+  
+  <!-- Search Section -->
+  <div class="card">
+    <div class="search-row">
+      <input 
+        type="text" 
+        id="search-input" 
+        placeholder="Search attributes (e.g., http, service.name, db)..."
+        spellcheck="false"
+        autocomplete="off"
+      />
+    </div>
+    
+    <div class="filters-row">
+      <div class="filter-group">
+        <label for="namespace-filter">Namespace:</label>
+        <select id="namespace-filter">
+          <option value="">All namespaces</option>
+          {namespaces.map(ns => (
+            <option value={ns}>{ns}</option>
+          ))}
+        </select>
+      </div>
+      
+      <div class="filter-group">
+        <label for="signal-filter">Signal:</label>
+        <select id="signal-filter">
+          <option value="">All signals</option>
+          <option value="traces">Traces</option>
+          <option value="metrics">Metrics</option>
+          <option value="logs">Logs</option>
+          <option value="resources">Resources</option>
+        </select>
+      </div>
+      
+      <div class="filter-group">
+        <label for="stability-filter">Stability:</label>
+        <select id="stability-filter">
+          <option value="">All</option>
+          <option value="stable">Stable</option>
+          <option value="experimental">Experimental</option>
+          <option value="deprecated">Deprecated</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Results Section -->
+  <div class="results-info">
+    <span id="results-count">Showing all {totalCount} attributes</span>
+  </div>
+  
+  <div id="results-container" class="results-container"></div>
+</Layout>
+
+<style>
+  .search-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+  
+  .search-row input {
+    flex: 1;
+    font-size: 1.1rem;
+    padding: 1rem;
+  }
+  
+  .filters-row {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+  
+  .filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .filter-group label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+  
+  .filter-group select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+  }
+  
+  .results-info {
+    padding: 0.75rem 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+  
+  .results-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .attr-card {
+    background: var(--bg-secondary);
+    border: var(--card-border);
+    border-radius: 10px;
+    padding: 1rem;
+    transition: all 0.2s ease;
+  }
+  
+  .attr-card:hover {
+    border-color: var(--accent-primary);
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .attr-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .attr-name {
+    font-family: monospace;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--accent-primary);
+    word-break: break-all;
+  }
+  
+  .attr-badges {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin-left: auto;
+  }
+  
+  .badge {
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  
+  .badge.type {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+  }
+  
+  .badge.stable {
+    background: var(--success-bg);
+    color: var(--success);
+    border: 1px solid var(--success-border);
+  }
+  
+  .badge.experimental {
+    background: var(--warning-bg);
+    color: var(--warning);
+    border: 1px solid var(--warning-border);
+  }
+  
+  .badge.deprecated {
+    background: var(--error-bg);
+    color: var(--error);
+    border: 1px solid var(--error-border);
+  }
+  
+  .badge.required {
+    background: var(--error);
+    color: white;
+  }
+  
+  .badge.conditionally_required {
+    background: var(--warning);
+    color: white;
+  }
+  
+  .badge.recommended {
+    background: var(--accent-secondary);
+    color: white;
+  }
+  
+  .badge.signal {
+    background: var(--accent-primary);
+    color: white;
+  }
+  
+  .attr-brief {
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 0.5rem;
+  }
+  
+  .attr-examples {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+  }
+  
+  .attr-examples-label {
+    color: var(--text-muted);
+  }
+  
+  .attr-example {
+    padding: 0.2rem 0.5rem;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+  }
+  
+  .no-results {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-secondary);
+  }
+  
+  .no-results-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+  
+  @media (max-width: 640px) {
+    .filters-row {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    .filter-group {
+      width: 100%;
+    }
+    
+    .filter-group select {
+      flex: 1;
+    }
+    
+    .attr-header {
+      flex-direction: column;
+    }
+    
+    .attr-badges {
+      margin-left: 0;
+    }
+  }
+</style>
+
+<script>
+  import { searchConventions, getAllConventions, type SemanticConvention, type SearchFilters } from '../lib/semconv';
+  
+  // DOM Elements
+  const searchInput = document.getElementById('search-input') as HTMLInputElement;
+  const namespaceFilter = document.getElementById('namespace-filter') as HTMLSelectElement;
+  const signalFilter = document.getElementById('signal-filter') as HTMLSelectElement;
+  const stabilityFilter = document.getElementById('stability-filter') as HTMLSelectElement;
+  const resultsCount = document.getElementById('results-count') as HTMLSpanElement;
+  const resultsContainer = document.getElementById('results-container') as HTMLDivElement;
+  
+  // Debounce timer
+  let debounceTimer: ReturnType<typeof setTimeout>;
+  
+  // Initial render
+  renderResults(getAllConventions());
+  
+  // Event listeners
+  searchInput.oninput = () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(performSearch, 150);
+  };
+  
+  namespaceFilter.onchange = performSearch;
+  signalFilter.onchange = performSearch;
+  stabilityFilter.onchange = performSearch;
+  
+  function performSearch() {
+    const query = searchInput.value.trim();
+    const filters: SearchFilters = {};
+    
+    if (namespaceFilter.value) filters.namespace = namespaceFilter.value;
+    if (signalFilter.value) filters.signal = signalFilter.value as any;
+    if (stabilityFilter.value) filters.stability = stabilityFilter.value as any;
+    
+    const results = searchConventions(query, filters);
+    renderResults(results);
+  }
+  
+  function renderResults(conventions: SemanticConvention[]) {
+    resultsCount.textContent = `Showing ${conventions.length} attribute${conventions.length !== 1 ? 's' : ''}`;
+    
+    if (conventions.length === 0) {
+      resultsContainer.innerHTML = `
+        <div class="no-results">
+          <div class="no-results-icon">🔍</div>
+          <div>No attributes found matching your criteria</div>
+        </div>
+      `;
+      return;
+    }
+    
+    resultsContainer.innerHTML = conventions.map(conv => `
+      <div class="attr-card">
+        <div class="attr-header">
+          <span class="attr-name">${escapeHtml(conv.name)}</span>
+          <div class="attr-badges">
+            <span class="badge type">${conv.type}</span>
+            <span class="badge ${conv.stability}">${conv.stability}</span>
+            ${conv.requirement ? `<span class="badge ${conv.requirement}">${conv.requirement.replace('_', ' ')}</span>` : ''}
+            ${conv.signal.map(s => `<span class="badge signal">${s}</span>`).join('')}
+          </div>
+        </div>
+        <div class="attr-brief">${escapeHtml(conv.brief)}</div>
+        ${conv.examples && conv.examples.length > 0 ? `
+          <div class="attr-examples">
+            <span class="attr-examples-label">Examples:</span>
+            ${conv.examples.slice(0, 3).map(ex => `<span class="attr-example">${escapeHtml(ex)}</span>`).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `).join('');
+  }
+  
+  function escapeHtml(str: string): string {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+</script>

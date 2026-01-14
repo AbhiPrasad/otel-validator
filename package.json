@@ -1,7 +1,7 @@
 {
-	"name": "otel-validator",
+	"name": "otel-tools",
 	"type": "module",
-	"version": "0.0.1",
+	"version": "1.0.0",
 	"packageManager": "yarn@1.22.22",
 	"scripts": {
 		"dev": "astro dev",

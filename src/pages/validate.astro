@@ -1,0 +1,629 @@
+---
+export const prerender = false;
+import Layout from '../components/Layout.astro';
+---
+
+<Layout 
+  title="OTLP Payload Validator" 
+  description="Validate OpenTelemetry Protocol (OTLP) payloads for traces, logs, and metrics"
+  activeNav="validate"
+>
+  <h1>OTLP Payload Validator</h1>
+  <p class="subtitle">
+    Validate OpenTelemetry Protocol (OTLP) payloads for traces, logs, and metrics
+  </p>
+
+  <div class="input-section">
+    <h2>Input Payload</h2>
+    <textarea
+      id="payload-input"
+      placeholder="Paste your OTLP JSON payload here..."
+      spellcheck="false"></textarea>
+
+    <div class="file-upload" id="file-drop">
+      <p>Drop a file here or click to upload (.json or .pb files)</p>
+      <input
+        type="file"
+        id="file-input"
+        accept=".json,.pb,.bin"
+        style="display: none"
+      />
+    </div>
+
+    <div class="buttons">
+      <button class="validate-btn" id="validate-btn"><span class="spinner"></span>Validate</button>
+      <button class="clear-btn" id="clear-btn">Clear</button>
+      <button class="example-btn" id="example-traces">Example Traces</button>
+      <button class="example-btn" id="example-logs">Example Logs</button>
+      <button class="example-btn" id="example-metrics">Example Metrics</button>
+    </div>
+  </div>
+
+  <div class="results-section">
+    <h2>Validation Results</h2>
+    <div id="results-container">
+      <div class="result-status pending">
+        Enter a payload and click Validate to see results
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  // Example OTLP payloads
+  const examples = {
+    traces: {
+      resourceSpans: [
+        {
+          resource: {
+            attributes: [
+              { key: "service.name", value: { stringValue: "my-service" } },
+            ],
+          },
+          scopeSpans: [
+            {
+              scope: { name: "my-library", version: "1.0.0" },
+              spans: [
+                {
+                  traceId: "0123456789abcdef0123456789abcdef",
+                  spanId: "0123456789abcdef",
+                  name: "GET /api/users",
+                  kind: 2,
+                  startTimeUnixNano: "1704067200000000000",
+                  endTimeUnixNano: "1704067200100000000",
+                  attributes: [
+                    { key: "http.method", value: { stringValue: "GET" } },
+                    { key: "http.status_code", value: { intValue: 200 } },
+                  ],
+                  status: { code: 1 },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    logs: {
+      resourceLogs: [
+        {
+          resource: {
+            attributes: [
+              { key: "service.name", value: { stringValue: "my-service" } },
+            ],
+          },
+          scopeLogs: [
+            {
+              scope: { name: "my-logger" },
+              logRecords: [
+                {
+                  timeUnixNano: "1704067200000000000",
+                  observedTimeUnixNano: "1704067200001000000",
+                  severityNumber: 9,
+                  severityText: "INFO",
+                  body: { stringValue: "User logged in successfully" },
+                  attributes: [
+                    { key: "user.id", value: { stringValue: "12345" } },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    metrics: {
+      resourceMetrics: [
+        {
+          resource: {
+            attributes: [
+              { key: "service.name", value: { stringValue: "my-service" } },
+            ],
+          },
+          scopeMetrics: [
+            {
+              scope: { name: "my-meter" },
+              metrics: [
+                {
+                  name: "http.request.duration",
+                  description: "Duration of HTTP requests",
+                  unit: "ms",
+                  histogram: {
+                    aggregationTemporality: 2,
+                    dataPoints: [
+                      {
+                        startTimeUnixNano: "1704067200000000000",
+                        timeUnixNano: "1704067260000000000",
+                        count: "100",
+                        sum: 5432.1,
+                        bucketCounts: ["10", "25", "40", "20", "5"],
+                        explicitBounds: [10, 50, 100, 500],
+                        min: 2.5,
+                        max: 892.3,
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  // Type definitions
+  interface ValidationError {
+    path: string;
+    message: string;
+    keyword: string;
+    schemaPath: string;
+  }
+
+  interface ValidationWarning {
+    path: string;
+    message: string;
+    suggestion?: string;
+  }
+
+  interface ValidationResult {
+    success: boolean;
+    payloadType: string | null;
+    errors?: ValidationError[];
+    warnings?: ValidationWarning[];
+    message?: string;
+  }
+
+  const textarea = document.getElementById(
+    "payload-input"
+  ) as HTMLTextAreaElement;
+  const validateBtn = document.getElementById(
+    "validate-btn"
+  ) as HTMLButtonElement;
+  const clearBtn = document.getElementById(
+    "clear-btn"
+  ) as HTMLButtonElement;
+  const resultsContainer = document.getElementById(
+    "results-container"
+  ) as HTMLDivElement;
+  const fileDrop = document.getElementById("file-drop") as HTMLDivElement;
+  const fileInput = document.getElementById(
+    "file-input"
+  ) as HTMLInputElement;
+
+  // Store last validation result for copy functionality
+  let lastValidationResult: ValidationResult | null = null;
+
+  // Example buttons
+  const exampleTracesBtn = document.getElementById("example-traces");
+  const exampleLogsBtn = document.getElementById("example-logs");
+  const exampleMetricsBtn = document.getElementById("example-metrics");
+
+  if (exampleTracesBtn) {
+    exampleTracesBtn.onclick = () => {
+      textarea.value = JSON.stringify(examples.traces, null, 2);
+    };
+  }
+  if (exampleLogsBtn) {
+    exampleLogsBtn.onclick = () => {
+      textarea.value = JSON.stringify(examples.logs, null, 2);
+    };
+  }
+  if (exampleMetricsBtn) {
+    exampleMetricsBtn.onclick = () => {
+      textarea.value = JSON.stringify(examples.metrics, null, 2);
+    };
+  }
+
+  // Clear button
+  clearBtn.onclick = () => {
+    textarea.value = "";
+    resultsContainer.innerHTML = `
+      <div class="result-status pending">
+        Enter a payload and click Validate to see results
+      </div>
+    `;
+  };
+
+  // File upload handling
+  fileDrop.onclick = () => fileInput.click();
+
+  fileDrop.ondragover = (e: DragEvent) => {
+    e.preventDefault();
+    fileDrop.classList.add("dragover");
+  };
+
+  fileDrop.ondragleave = () => {
+    fileDrop.classList.remove("dragover");
+  };
+
+  fileDrop.ondrop = async (e: DragEvent) => {
+    e.preventDefault();
+    fileDrop.classList.remove("dragover");
+    const file = e.dataTransfer?.files[0];
+    if (file) await handleFile(file);
+  };
+
+  fileInput.onchange = async (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (file) await handleFile(file);
+  };
+
+  async function handleFile(file: File): Promise<void> {
+    if (file.name.endsWith(".json")) {
+      const text = await file.text();
+      textarea.value = text;
+    } else if (file.name.endsWith(".pb") || file.name.endsWith(".bin")) {
+      // Binary file - validate directly
+      await validateProtobuf(file);
+    } else {
+      // Try to read as text
+      const text = await file.text();
+      textarea.value = text;
+    }
+  }
+
+  async function validateProtobuf(file: File): Promise<void> {
+    validateBtn.disabled = true;
+    validateBtn.classList.add("loading");
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const response = await fetch("/api/validate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-protobuf",
+        },
+        body: buffer,
+      });
+
+      const result: ValidationResult = await response.json();
+      displayResults(result);
+    } catch (e) {
+      const error = e instanceof Error ? e.message : "Unknown error";
+      displayResults({
+        success: false,
+        payloadType: null,
+        errors: [
+          {
+            path: "",
+            message: error,
+            keyword: "network",
+            schemaPath: "#",
+          },
+        ],
+      });
+    } finally {
+      validateBtn.disabled = false;
+      validateBtn.classList.remove("loading");
+    }
+  }
+
+  // Validate button
+  validateBtn.onclick = async () => {
+    const payload = textarea.value.trim();
+
+    if (!payload) {
+      displayResults({
+        success: false,
+        payloadType: null,
+        errors: [
+          {
+            path: "",
+            message: "Please enter a payload",
+            keyword: "required",
+            schemaPath: "#",
+          },
+        ],
+      });
+      return;
+    }
+
+    validateBtn.disabled = true;
+    validateBtn.classList.add("loading");
+
+    try {
+      const response = await fetch("/api/validate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: payload,
+      });
+
+      const result: ValidationResult = await response.json();
+      displayResults(result);
+    } catch (e) {
+      const error = e instanceof Error ? e.message : "Unknown error";
+      displayResults({
+        success: false,
+        payloadType: null,
+        errors: [
+          {
+            path: "",
+            message: error,
+            keyword: "network",
+            schemaPath: "#",
+          },
+        ],
+      });
+    } finally {
+      validateBtn.disabled = false;
+      validateBtn.classList.remove("loading");
+    }
+  };
+
+  // Keyboard shortcut: Ctrl/Cmd + Enter to validate
+  textarea.onkeydown = (e: KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      validateBtn.click();
+    }
+  };
+
+  function displayResults(result: ValidationResult): void {
+    let html = "";
+
+    if (result.success) {
+      html = `
+        <div class="result-status valid">
+          <span>✓ Valid payload</span>
+          <span class="payload-type">${result.payloadType}</span>
+        </div>
+      `;
+    } else {
+      html = `
+        <div class="result-status invalid">
+          <span>✗ Invalid payload</span>
+          ${result.payloadType ? `<span class="payload-type">${result.payloadType}</span>` : ""}
+        </div>
+      `;
+
+      const errorCount = result.errors ? result.errors.length : 0;
+      const warningCount = result.warnings ? result.warnings.length : 0;
+
+      // Store the result for copy functionality
+      lastValidationResult = result;
+
+      if (errorCount > 0 || warningCount > 0) {
+        html += `<div class="summary-bar">`;
+        if (errorCount > 0) {
+          html += `<span class="summary-item errors">⚠ ${errorCount} error${errorCount !== 1 ? "s" : ""}</span>`;
+        }
+        if (warningCount > 0) {
+          html += `<span class="summary-item warnings">⚡ ${warningCount} warning${warningCount !== 1 ? "s" : ""}</span>`;
+        }
+        html += `<button class="copy-llm-btn" id="copy-llm-btn" title="Copy errors formatted for AI assistants">📋 Copy for LLMs</button>`;
+        html += `</div>`;
+      }
+
+      if (result.errors && result.errors.length > 0) {
+        // Group errors by path
+        const errorsByPath: Record<string, ValidationError[]> = {};
+        for (const error of result.errors) {
+          const path = error.path || "(root)";
+          if (!errorsByPath[path]) {
+            errorsByPath[path] = [];
+          }
+          errorsByPath[path].push(error);
+        }
+
+        html += '<h3>Errors</h3><div class="error-list">';
+
+        for (const [path, errors] of Object.entries(errorsByPath)) {
+          const displayPath = formatPath(path);
+
+          html += `
+            <div class="error-group">
+              <div class="error-group-header">
+                <span class="path-icon">📍</span>
+                <span class="path-text">${escapeHtml(displayPath)}</span>
+                ${errors.length > 1 ? `<span class="error-count">${errors.length}</span>` : ""}
+              </div>
+              <div class="error-group-body">
+          `;
+
+          for (const error of errors) {
+            const keywordClass = getKeywordClass(error.keyword);
+            html += `
+              <div class="error-item">
+                <span class="error-icon">✕</span>
+                <div class="error-content">
+                  <div class="error-message">${escapeHtml(error.message)}</div>
+                  <div class="error-meta">
+                    <span class="error-keyword ${keywordClass}">${escapeHtml(error.keyword)}</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }
+
+          html += `</div></div>`;
+        }
+
+        html += "</div>";
+      }
+    }
+
+    // Warnings (show for both valid and invalid)
+    if (result.warnings && result.warnings.length > 0) {
+      // Group warnings by path
+      const warningsByPath: Record<string, ValidationWarning[]> = {};
+      for (const warning of result.warnings) {
+        const path = warning.path || "(root)";
+        if (!warningsByPath[path]) {
+          warningsByPath[path] = [];
+        }
+        warningsByPath[path].push(warning);
+      }
+
+      html += '<h3>Warnings</h3><div class="warning-list">';
+
+      for (const [path, warnings] of Object.entries(warningsByPath)) {
+        const displayPath = formatPath(path);
+
+        html += `
+          <div class="warning-group">
+            <div class="warning-group-header">
+              <span class="path-icon">📍</span>
+              <span class="path-text">${escapeHtml(displayPath)}</span>
+            </div>
+            <div class="warning-group-body">
+        `;
+
+        for (const warning of warnings) {
+          html += `
+            <div class="warning-item">
+              <span class="warning-icon">⚠</span>
+              <div class="warning-content">
+                <div class="warning-message">${escapeHtml(warning.message)}</div>
+                ${warning.suggestion ? `<div class="warning-suggestion">💡 ${escapeHtml(warning.suggestion)}</div>` : ""}
+              </div>
+            </div>
+          `;
+        }
+
+        html += `</div></div>`;
+      }
+
+      html += "</div>";
+    }
+
+    resultsContainer.innerHTML = html;
+
+    // Attach copy button event listener if present
+    const copyBtn = document.getElementById("copy-llm-btn");
+    if (copyBtn) {
+      copyBtn.onclick = copyErrorsForLLM;
+    }
+  }
+
+  function copyErrorsForLLM(): void {
+    const result = lastValidationResult;
+    if (!result) return;
+
+    const markdown = formatResultAsMarkdown(result);
+
+    navigator.clipboard
+      .writeText(markdown)
+      .then(() => {
+        const btn = document.getElementById("copy-llm-btn");
+        if (btn) {
+          btn.classList.add("copied");
+          btn.innerHTML = "✓ Copied!";
+          setTimeout(() => {
+            btn.classList.remove("copied");
+            btn.innerHTML = "📋 Copy for LLMs";
+          }, 2000);
+        }
+      })
+      .catch((err: unknown) => {
+        console.error("Failed to copy:", err);
+        alert("Failed to copy to clipboard");
+      });
+  }
+
+  function formatResultAsMarkdown(result: ValidationResult): string {
+    let md = "";
+
+    // Header
+    md += `## OTLP Validation Errors\n\n`;
+
+    if (result.payloadType) {
+      md += `**Payload Type:** ${result.payloadType}\n\n`;
+    }
+
+    const errorCount = result.errors ? result.errors.length : 0;
+    const warningCount = result.warnings ? result.warnings.length : 0;
+
+    md += `**Status:** ${errorCount} error${errorCount !== 1 ? "s" : ""}`;
+    if (warningCount > 0) {
+      md += `, ${warningCount} warning${warningCount !== 1 ? "s" : ""}`;
+    }
+    md += `\n\n`;
+
+    // Errors grouped by path
+    if (result.errors && result.errors.length > 0) {
+      md += `### Errors\n\n`;
+
+      // Group by path
+      const errorsByPath: Record<string, ValidationError[]> = {};
+      for (const error of result.errors) {
+        const path = error.path || "(root)";
+        if (!errorsByPath[path]) {
+          errorsByPath[path] = [];
+        }
+        errorsByPath[path].push(error);
+      }
+
+      for (const [path, errors] of Object.entries(errorsByPath)) {
+        md += `#### \`${path}\`\n\n`;
+        for (const error of errors) {
+          md += `- **${error.keyword}**: ${error.message}\n`;
+        }
+        md += `\n`;
+      }
+    }
+
+    // Warnings grouped by path
+    if (result.warnings && result.warnings.length > 0) {
+      md += `### Warnings\n\n`;
+
+      const warningsByPath: Record<string, ValidationWarning[]> = {};
+      for (const warning of result.warnings) {
+        const path = warning.path || "(root)";
+        if (!warningsByPath[path]) {
+          warningsByPath[path] = [];
+        }
+        warningsByPath[path].push(warning);
+      }
+
+      for (const [path, warnings] of Object.entries(warningsByPath)) {
+        md += `#### \`${path}\`\n\n`;
+        for (const warning of warnings) {
+          md += `- ${warning.message}\n`;
+          if (warning.suggestion) {
+            md += `  - *Suggestion: ${warning.suggestion}*\n`;
+          }
+        }
+        md += `\n`;
+      }
+    }
+
+    // Add context for LLM
+    md += `---\n\n`;
+    md += `*These are validation errors from an OTLP (OpenTelemetry Protocol) payload. `;
+    md += `Please help me understand and fix these issues.*\n`;
+
+    return md;
+  }
+
+  function formatPath(path: string): string {
+    if (!path || path === "/" || path === "(root)") {
+      return "(root)";
+    }
+    // Make the path more readable by adding spaces around slashes for wrapping
+    // and highlighting the key parts
+    return path;
+  }
+
+  function getKeywordClass(keyword: string): string {
+    const keywordMap: Record<string, string> = {
+      type: "type",
+      pattern: "pattern",
+      enum: "enum",
+      required: "required",
+      semantic: "semantic",
+    };
+    return keywordMap[keyword] || "";
+  }
+
+  function escapeHtml(str: string): string {
+    if (!str) return "";
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+</script>

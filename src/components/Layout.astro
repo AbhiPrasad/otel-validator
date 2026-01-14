@@ -1,0 +1,38 @@
+---
+import Navbar from './Navbar.astro';
+import Footer from './Footer.astro';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+  activeNav?: string;
+}
+
+const { title, description = "OpenTelemetry developer tools", activeNav } = Astro.props;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <title>{title} | OTel Tools</title>
+    <script is:inline>
+      // Prevent flash of unstyled content - set theme before render
+      (function() {
+        const stored = localStorage.getItem('theme');
+        const system = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', stored || system);
+      })();
+    </script>
+  </head>
+  <body>
+    <Navbar activeNav={activeNav} />
+    <main>
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>
