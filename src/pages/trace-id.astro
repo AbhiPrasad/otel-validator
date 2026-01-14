@@ -1,0 +1,502 @@
+---
+export const prerender = false;
+import Layout from '../components/Layout.astro';
+---
+
+<Layout 
+  title="Trace ID Generator" 
+  description="Generate and validate OpenTelemetry trace IDs and span IDs"
+  activeNav="trace-id"
+>
+  <h1>Trace ID / Span ID Generator</h1>
+  <p class="subtitle">Generate and validate OpenTelemetry trace and span identifiers</p>
+  
+  <!-- Generate Section -->
+  <div class="card">
+    <h2>Generate IDs</h2>
+    
+    <div class="generate-controls">
+      <div class="control-group">
+        <label for="count">Count:</label>
+        <input type="number" id="count" value="1" min="1" max="100" />
+      </div>
+      
+      <div class="button-group">
+        <button class="primary-btn" id="gen-trace-btn">Generate Trace ID</button>
+        <button class="primary-btn" id="gen-span-btn">Generate Span ID</button>
+        <button class="secondary-btn" id="gen-pair-btn">Generate Pair</button>
+      </div>
+    </div>
+    
+    <div id="generated-results" class="results-area"></div>
+  </div>
+  
+  <!-- Validate Section -->
+  <div class="card">
+    <h2>Validate ID</h2>
+    
+    <div class="validate-controls">
+      <div class="input-row">
+        <input 
+          type="text" 
+          id="validate-input" 
+          placeholder="Paste a trace ID or span ID to validate..."
+          spellcheck="false"
+          autocomplete="off"
+        />
+        <button class="secondary-btn" id="validate-btn">Validate</button>
+      </div>
+      
+      <div class="id-type-selector">
+        <label>
+          <input type="radio" name="id-type" value="auto" checked /> Auto-detect
+        </label>
+        <label>
+          <input type="radio" name="id-type" value="trace" /> Trace ID (32 chars)
+        </label>
+        <label>
+          <input type="radio" name="id-type" value="span" /> Span ID (16 chars)
+        </label>
+      </div>
+    </div>
+    
+    <div id="validation-results" class="results-area"></div>
+  </div>
+  
+  <!-- Info Section -->
+  <div class="card info-card">
+    <h2>About OpenTelemetry IDs</h2>
+    <dl>
+      <dt>Trace ID</dt>
+      <dd>A 128-bit (16-byte) identifier represented as 32 lowercase hexadecimal characters. Uniquely identifies a distributed trace across all participating services.</dd>
+      
+      <dt>Span ID</dt>
+      <dd>A 64-bit (8-byte) identifier represented as 16 lowercase hexadecimal characters. Uniquely identifies a single operation within a trace.</dd>
+      
+      <dt>Requirements</dt>
+      <dd>
+        <ul>
+          <li>Must be valid hexadecimal (0-9, a-f)</li>
+          <li>Must not be all zeros (represents invalid/unset)</li>
+          <li>Case-insensitive (normalized to lowercase)</li>
+        </ul>
+      </dd>
+      
+      <dt>Specification</dt>
+      <dd>
+        Defined in the <a href="https://www.w3.org/TR/trace-context/" target="_blank" rel="noopener noreferrer">W3C Trace Context</a> specification.
+      </dd>
+    </dl>
+  </div>
+</Layout>
+
+<style>
+  .generate-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+  }
+  
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .control-group label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+  
+  .control-group input[type="number"] {
+    width: 80px;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+  }
+  
+  .button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .results-area {
+    min-height: 20px;
+    margin-top: 1rem;
+  }
+  
+  .id-result {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    transition: background-color 0.3s ease;
+  }
+  
+  .id-result .id-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    min-width: 65px;
+    flex-shrink: 0;
+  }
+  
+  .id-result .id-value {
+    flex: 1;
+    font-family: "Monaco", "Menlo", "Consolas", monospace;
+    font-size: 0.95rem;
+    word-break: break-all;
+    color: var(--text-primary);
+  }
+  
+  .id-result .copy-btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+  }
+  
+  .pair-separator {
+    margin: 0.75rem 0;
+    border: none;
+    border-top: 1px dashed var(--border-color);
+  }
+  
+  .validate-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .input-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+  
+  .input-row input[type="text"] {
+    flex: 1;
+    font-family: "Monaco", "Menlo", "Consolas", monospace;
+    font-size: 0.95rem;
+  }
+  
+  .id-type-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+  
+  .id-type-selector label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+  }
+  
+  .id-type-selector input[type="radio"] {
+    accent-color: var(--accent-primary);
+  }
+  
+  .validation-result {
+    padding: 1rem;
+    border-radius: 8px;
+  }
+  
+  .validation-result.valid {
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
+  }
+  
+  .validation-result.valid .result-header {
+    color: var(--success);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .validation-result.invalid {
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+  }
+  
+  .validation-result.invalid .result-header {
+    color: var(--error);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .validation-result .normalized-value {
+    margin-top: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    font-family: "Monaco", "Menlo", "Consolas", monospace;
+    font-size: 0.9rem;
+    word-break: break-all;
+    color: var(--text-primary);
+  }
+  
+  .validation-result ul {
+    margin: 0.75rem 0 0 1.25rem;
+    padding: 0;
+    color: var(--text-primary);
+  }
+  
+  .validation-result li {
+    margin-bottom: 0.25rem;
+    line-height: 1.4;
+  }
+  
+  .info-card {
+    background: var(--bg-tertiary);
+  }
+  
+  .info-card h2 {
+    color: var(--text-primary);
+  }
+  
+  .info-card dl {
+    margin: 0;
+  }
+  
+  .info-card dt {
+    font-weight: 600;
+    color: var(--accent-primary);
+    margin-top: 1rem;
+  }
+  
+  .info-card dt:first-of-type {
+    margin-top: 0;
+  }
+  
+  .info-card dd {
+    margin: 0.25rem 0 0 0;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+  
+  .info-card ul {
+    margin: 0.5rem 0 0 1.25rem;
+    padding: 0;
+  }
+  
+  .info-card li {
+    margin-bottom: 0.25rem;
+  }
+  
+  .info-card a {
+    color: var(--accent-primary);
+    text-decoration: none;
+  }
+  
+  .info-card a:hover {
+    text-decoration: underline;
+  }
+  
+  @media (max-width: 640px) {
+    .generate-controls {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .button-group {
+      flex-direction: column;
+    }
+    
+    .button-group button {
+      width: 100%;
+    }
+    
+    .input-row {
+      flex-direction: column;
+    }
+    
+    .input-row button {
+      width: 100%;
+    }
+    
+    .id-result {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    
+    .id-result .copy-btn {
+      align-self: flex-end;
+    }
+  }
+</style>
+
+<script>
+  import { 
+    generateTraceId, 
+    generateSpanId, 
+    validateTraceId, 
+    validateSpanId,
+    generateTraceIds,
+    generateSpanIds
+  } from '../lib/id-generator';
+  
+  // DOM Elements
+  const countInput = document.getElementById('count') as HTMLInputElement;
+  const genTraceBtn = document.getElementById('gen-trace-btn') as HTMLButtonElement;
+  const genSpanBtn = document.getElementById('gen-span-btn') as HTMLButtonElement;
+  const genPairBtn = document.getElementById('gen-pair-btn') as HTMLButtonElement;
+  const generatedResults = document.getElementById('generated-results') as HTMLDivElement;
+  
+  const validateInput = document.getElementById('validate-input') as HTMLInputElement;
+  const validateBtn = document.getElementById('validate-btn') as HTMLButtonElement;
+  const validationResults = document.getElementById('validation-results') as HTMLDivElement;
+  
+  // Helper to create an ID result row
+  function createIdRow(label: string, value: string): string {
+    return `
+      <div class="id-result">
+        <span class="id-label">${label}</span>
+        <span class="id-value">${value}</span>
+        <button class="copy-btn secondary-btn" data-copy="${value}">Copy</button>
+      </div>
+    `;
+  }
+  
+  // Generate Trace ID(s)
+  genTraceBtn.onclick = () => {
+    const count = Math.max(1, Math.min(100, parseInt(countInput.value) || 1));
+    const ids = generateTraceIds(count);
+    generatedResults.innerHTML = ids.map(id => createIdRow('Trace ID', id)).join('');
+    attachCopyHandlers();
+  };
+  
+  // Generate Span ID(s)
+  genSpanBtn.onclick = () => {
+    const count = Math.max(1, Math.min(100, parseInt(countInput.value) || 1));
+    const ids = generateSpanIds(count);
+    generatedResults.innerHTML = ids.map(id => createIdRow('Span ID', id)).join('');
+    attachCopyHandlers();
+  };
+  
+  // Generate Pair (Trace + Span)
+  genPairBtn.onclick = () => {
+    const count = Math.max(1, Math.min(100, parseInt(countInput.value) || 1));
+    let html = '';
+    for (let i = 0; i < count; i++) {
+      html += createIdRow('Trace ID', generateTraceId());
+      html += createIdRow('Span ID', generateSpanId());
+      if (i < count - 1) html += '<hr class="pair-separator" />';
+    }
+    generatedResults.innerHTML = html;
+    attachCopyHandlers();
+  };
+  
+  // Validate ID
+  validateBtn.onclick = () => validateId();
+  validateInput.onkeydown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter') validateId();
+  };
+  
+  // Real-time validation as user types (debounced)
+  let debounceTimer: ReturnType<typeof setTimeout>;
+  validateInput.oninput = () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      if (validateInput.value.trim()) {
+        validateId();
+      } else {
+        validationResults.innerHTML = '';
+      }
+    }, 150);
+  };
+  
+  function validateId(): void {
+    const value = validateInput.value.trim();
+    if (!value) {
+      validationResults.innerHTML = '';
+      return;
+    }
+    
+    const idTypeRadios = document.querySelectorAll('input[name="id-type"]') as NodeListOf<HTMLInputElement>;
+    let selectedType = 'auto';
+    for (const radio of idTypeRadios) {
+      if (radio.checked) {
+        selectedType = radio.value;
+        break;
+      }
+    }
+    
+    // Auto-detect based on length
+    let type: 'trace' | 'span';
+    if (selectedType === 'auto') {
+      // Use length to guess - 32 chars is trace, 16 is span
+      // For lengths in between, bias toward the closer one
+      type = value.length >= 24 ? 'trace' : 'span';
+    } else {
+      type = selectedType as 'trace' | 'span';
+    }
+    
+    const result = type === 'trace' ? validateTraceId(value) : validateSpanId(value);
+    
+    if (result.valid) {
+      validationResults.innerHTML = `
+        <div class="validation-result valid">
+          <div class="result-header">
+            <span>✓</span>
+            <span>Valid ${type === 'trace' ? 'Trace' : 'Span'} ID</span>
+          </div>
+          <div class="normalized-value">${result.normalized}</div>
+        </div>
+      `;
+    } else {
+      validationResults.innerHTML = `
+        <div class="validation-result invalid">
+          <div class="result-header">
+            <span>✗</span>
+            <span>Invalid ${type === 'trace' ? 'Trace' : 'Span'} ID</span>
+          </div>
+          <ul>
+            ${result.errors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+    }
+  }
+  
+  function attachCopyHandlers(): void {
+    const copyBtns = document.querySelectorAll('.copy-btn[data-copy]') as NodeListOf<HTMLButtonElement>;
+    copyBtns.forEach(btn => {
+      btn.onclick = async () => {
+        const text = btn.getAttribute('data-copy');
+        if (text) {
+          try {
+            await navigator.clipboard.writeText(text);
+            const original = btn.textContent;
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(() => {
+              btn.textContent = original;
+              btn.classList.remove('copied');
+            }, 1500);
+          } catch (err) {
+            console.error('Failed to copy:', err);
+          }
+        }
+      };
+    });
+  }
+  
+  function escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+</script>

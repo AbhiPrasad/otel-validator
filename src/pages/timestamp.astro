@@ -1,0 +1,497 @@
+---
+export const prerender = false;
+import Layout from '../components/Layout.astro';
+---
+
+<Layout 
+  title="Timestamp Converter" 
+  description="Convert between Unix nanoseconds, milliseconds, and human-readable timestamps"
+  activeNav="timestamp"
+>
+  <h1>Timestamp Converter</h1>
+  <p class="subtitle">Convert between OTLP nanosecond timestamps and other formats</p>
+  
+  <!-- Convert Section -->
+  <div class="card">
+    <h2>Convert Timestamp</h2>
+    
+    <div class="input-row">
+      <input 
+        type="text" 
+        id="timestamp-input" 
+        placeholder="Enter timestamp (e.g., 1704067200000000000)"
+        spellcheck="false"
+        autocomplete="off"
+      />
+      <select id="format-select">
+        <option value="auto">Auto-detect</option>
+        <option value="ns">Nanoseconds</option>
+        <option value="ms">Milliseconds</option>
+        <option value="s">Seconds</option>
+        <option value="iso">ISO 8601</option>
+      </select>
+      <button class="primary-btn" id="convert-btn">Convert</button>
+      <button class="secondary-btn" id="now-btn">Now</button>
+    </div>
+    
+    <div id="convert-results" class="results-area"></div>
+  </div>
+  
+  <!-- Duration Calculator -->
+  <div class="card">
+    <h2>Duration Calculator</h2>
+    <p class="section-description">Calculate the duration between two nanosecond timestamps</p>
+    
+    <div class="duration-inputs">
+      <div class="duration-group">
+        <label for="start-ns">Start (nanoseconds)</label>
+        <input type="text" id="start-ns" placeholder="1704067200000000000" />
+      </div>
+      <div class="duration-group">
+        <label for="end-ns">End (nanoseconds)</label>
+        <input type="text" id="end-ns" placeholder="1704067200100000000" />
+      </div>
+      <button class="primary-btn" id="calc-duration-btn">Calculate</button>
+    </div>
+    
+    <div id="duration-results" class="results-area"></div>
+  </div>
+  
+  <!-- Quick Reference -->
+  <div class="card">
+    <h2>Current Time</h2>
+    <div id="current-time" class="current-time-display">
+      <div class="time-row">
+        <span class="time-label">Nanoseconds:</span>
+        <span class="time-value" id="current-ns">-</span>
+        <button class="copy-btn-small" data-copy-id="current-ns">Copy</button>
+      </div>
+      <div class="time-row">
+        <span class="time-label">Milliseconds:</span>
+        <span class="time-value" id="current-ms">-</span>
+        <button class="copy-btn-small" data-copy-id="current-ms">Copy</button>
+      </div>
+      <div class="time-row">
+        <span class="time-label">Seconds:</span>
+        <span class="time-value" id="current-s">-</span>
+        <button class="copy-btn-small" data-copy-id="current-s">Copy</button>
+      </div>
+      <div class="time-row">
+        <span class="time-label">ISO 8601:</span>
+        <span class="time-value" id="current-iso">-</span>
+        <button class="copy-btn-small" data-copy-id="current-iso">Copy</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Info Section -->
+  <div class="card info-card">
+    <h2>About OTLP Timestamps</h2>
+    <dl>
+      <dt>Format</dt>
+      <dd>OTLP uses Unix nanoseconds (nanoseconds since Jan 1, 1970 UTC) represented as strings in JSON.</dd>
+      
+      <dt>Fields</dt>
+      <dd>
+        <ul>
+          <li><code>startTimeUnixNano</code> / <code>endTimeUnixNano</code> - Span timestamps</li>
+          <li><code>timeUnixNano</code> - Metric/Log timestamps</li>
+          <li><code>observedTimeUnixNano</code> - When log was observed</li>
+        </ul>
+      </dd>
+      
+      <dt>Precision</dt>
+      <dd>Nanosecond precision (10<sup>-9</sup> seconds). JavaScript Date only supports millisecond precision.</dd>
+    </dl>
+  </div>
+</Layout>
+
+<style>
+  .section-description {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin: 0 0 1rem 0;
+  }
+  
+  .input-row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  .input-row input {
+    flex: 1;
+    min-width: 200px;
+    font-family: monospace;
+  }
+  
+  .input-row select {
+    padding: 0.75rem;
+    border: 1px solid var(--input-border);
+    border-radius: 8px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 1rem;
+  }
+  
+  .results-area {
+    margin-top: 1rem;
+    min-height: 20px;
+  }
+  
+  .result-box {
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    padding: 1rem;
+  }
+  
+  .result-box.success {
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
+  }
+  
+  .result-box.error {
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+  }
+  
+  .result-grid {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.5rem 1rem;
+    align-items: center;
+  }
+  
+  .result-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  
+  .result-value {
+    font-family: monospace;
+    color: var(--text-primary);
+    word-break: break-all;
+  }
+  
+  .result-value.highlight {
+    color: var(--accent-primary);
+  }
+  
+  .duration-inputs {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  
+  .duration-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+    min-width: 200px;
+  }
+  
+  .duration-group label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+  
+  .duration-group input {
+    font-family: monospace;
+  }
+  
+  .duration-result {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+  }
+  
+  .duration-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+    margin-bottom: 0.5rem;
+  }
+  
+  .duration-details {
+    color: var(--text-secondary);
+    font-family: monospace;
+  }
+  
+  .current-time-display {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .time-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+  }
+  
+  .time-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 120px;
+  }
+  
+  .time-value {
+    flex: 1;
+    font-family: monospace;
+    color: var(--text-primary);
+    word-break: break-all;
+  }
+  
+  .copy-btn-small {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    background: var(--button-secondary-bg);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-primary);
+  }
+  
+  .copy-btn-small:hover {
+    background: var(--accent-primary);
+    color: white;
+  }
+  
+  .info-card {
+    background: var(--bg-tertiary);
+  }
+  
+  .info-card h2 {
+    color: var(--text-primary);
+  }
+  
+  .info-card dl {
+    margin: 0;
+  }
+  
+  .info-card dt {
+    font-weight: 600;
+    color: var(--accent-primary);
+    margin-top: 1rem;
+  }
+  
+  .info-card dt:first-of-type {
+    margin-top: 0;
+  }
+  
+  .info-card dd {
+    margin: 0.25rem 0 0 0;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+  
+  .info-card ul {
+    margin: 0.5rem 0 0 1.25rem;
+    padding: 0;
+  }
+  
+  .info-card code {
+    background: var(--bg-secondary);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  
+  @media (max-width: 640px) {
+    .input-row {
+      flex-direction: column;
+    }
+    
+    .input-row input,
+    .input-row select,
+    .input-row button {
+      width: 100%;
+    }
+    
+    .duration-inputs {
+      flex-direction: column;
+    }
+    
+    .time-row {
+      flex-wrap: wrap;
+    }
+    
+    .time-label {
+      min-width: 100%;
+    }
+  }
+</style>
+
+<script>
+  import { parseTimestamp, getCurrentTimestamp, calculateDuration } from '../lib/timestamp';
+  
+  // DOM Elements
+  const timestampInput = document.getElementById('timestamp-input') as HTMLInputElement;
+  const formatSelect = document.getElementById('format-select') as HTMLSelectElement;
+  const convertBtn = document.getElementById('convert-btn') as HTMLButtonElement;
+  const nowBtn = document.getElementById('now-btn') as HTMLButtonElement;
+  const convertResults = document.getElementById('convert-results') as HTMLDivElement;
+  
+  const startNsInput = document.getElementById('start-ns') as HTMLInputElement;
+  const endNsInput = document.getElementById('end-ns') as HTMLInputElement;
+  const calcDurationBtn = document.getElementById('calc-duration-btn') as HTMLButtonElement;
+  const durationResults = document.getElementById('duration-results') as HTMLDivElement;
+  
+  // Current time elements
+  const currentNs = document.getElementById('current-ns') as HTMLSpanElement;
+  const currentMs = document.getElementById('current-ms') as HTMLSpanElement;
+  const currentS = document.getElementById('current-s') as HTMLSpanElement;
+  const currentIso = document.getElementById('current-iso') as HTMLSpanElement;
+  
+  // Update current time display
+  function updateCurrentTime() {
+    const ts = getCurrentTimestamp();
+    currentNs.textContent = ts.nanoseconds;
+    currentMs.textContent = ts.milliseconds;
+    currentS.textContent = ts.seconds;
+    currentIso.textContent = ts.iso8601;
+  }
+  
+  // Update every second
+  updateCurrentTime();
+  setInterval(updateCurrentTime, 1000);
+  
+  // Convert functionality
+  convertBtn.onclick = () => convertTimestamp();
+  timestampInput.onkeydown = (e) => { if (e.key === 'Enter') convertTimestamp(); };
+  
+  nowBtn.onclick = () => {
+    const ts = getCurrentTimestamp();
+    timestampInput.value = ts.nanoseconds;
+    formatSelect.value = 'ns';
+    convertTimestamp();
+  };
+  
+  function convertTimestamp() {
+    const value = timestampInput.value.trim();
+    if (!value) {
+      convertResults.innerHTML = '';
+      return;
+    }
+    
+    const format = formatSelect.value as 'auto' | 'ns' | 'ms' | 's' | 'iso';
+    const result = parseTimestamp(value, format);
+    
+    if (result.success && result.timestamp) {
+      const ts = result.timestamp;
+      convertResults.innerHTML = `
+        <div class="result-box success">
+          <div class="result-grid">
+            <span class="result-label">Nanoseconds:</span>
+            <span class="result-value highlight">${ts.nanoseconds}</span>
+            <button class="copy-btn-small" data-copy="${ts.nanoseconds}">Copy</button>
+            
+            <span class="result-label">Milliseconds:</span>
+            <span class="result-value">${ts.milliseconds}</span>
+            <button class="copy-btn-small" data-copy="${ts.milliseconds}">Copy</button>
+            
+            <span class="result-label">Seconds:</span>
+            <span class="result-value">${ts.seconds}</span>
+            <button class="copy-btn-small" data-copy="${ts.seconds}">Copy</button>
+            
+            <span class="result-label">ISO 8601:</span>
+            <span class="result-value">${ts.iso8601}</span>
+            <button class="copy-btn-small" data-copy="${ts.iso8601}">Copy</button>
+            
+            <span class="result-label">Human:</span>
+            <span class="result-value">${ts.human}</span>
+            <span></span>
+          </div>
+        </div>
+      `;
+      attachCopyHandlers();
+    } else {
+      convertResults.innerHTML = `
+        <div class="result-box error">
+          <strong>Conversion error</strong>
+          <ul style="margin: 0.5rem 0 0 1.25rem; padding: 0;">
+            ${result.errors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+    }
+  }
+  
+  // Duration calculation
+  calcDurationBtn.onclick = () => calcDuration();
+  
+  function calcDuration() {
+    const startNs = startNsInput.value.trim();
+    const endNs = endNsInput.value.trim();
+    
+    if (!startNs || !endNs) {
+      durationResults.innerHTML = `
+        <div class="result-box error">
+          Both start and end timestamps are required
+        </div>
+      `;
+      return;
+    }
+    
+    const result = calculateDuration(startNs, endNs);
+    
+    if (result.success && result.duration) {
+      const d = result.duration;
+      durationResults.innerHTML = `
+        <div class="duration-result">
+          <div class="duration-value">${d.human}</div>
+          <div class="duration-details">
+            ${d.nanoseconds.toString()}ns = ${d.milliseconds}ms = ${d.seconds.toFixed(6)}s
+          </div>
+        </div>
+      `;
+    } else {
+      durationResults.innerHTML = `
+        <div class="result-box error">
+          <strong>Calculation error</strong>
+          <ul style="margin: 0.5rem 0 0 1.25rem; padding: 0;">
+            ${result.errors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+    }
+  }
+  
+  // Copy handlers for current time section
+  document.querySelectorAll('.copy-btn-small[data-copy-id]').forEach(btn => {
+    (btn as HTMLButtonElement).onclick = async () => {
+      const id = btn.getAttribute('data-copy-id');
+      if (id) {
+        const el = document.getElementById(id);
+        if (el) {
+          await navigator.clipboard.writeText(el.textContent || '');
+          btn.textContent = 'Copied!';
+          setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+        }
+      }
+    };
+  });
+  
+  function attachCopyHandlers() {
+    document.querySelectorAll('.copy-btn-small[data-copy]').forEach(btn => {
+      (btn as HTMLButtonElement).onclick = async () => {
+        const text = btn.getAttribute('data-copy');
+        if (text) {
+          await navigator.clipboard.writeText(text);
+          btn.textContent = 'Copied!';
+          setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+        }
+      };
+    });
+  }
+  
+  function escapeHtml(str: string): string {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+</script>
